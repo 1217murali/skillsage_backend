@@ -1,0 +1,33 @@
+# Core Web Framework
+django
+djangorestframework
+python-decouple
+django-cors-headers
+
+# Authentication and Security
+djangorestframework-simplejwt
+google-auth
+dj-rest-auth
+django-allauth
+
+# HTTP Requests and Web Scraping
+requests
+beautifulsoup4
+
+# LLM and RAG (Vector Store) Components
+openai
+langchain
+langchain-community
+chromadb
+sentence-transformers
+
+# Audio Transcription and Processing
+# Note: These packages (numpy, scipy, librosa) are dependencies for `openai-whisper`
+# and audio file handling, which are used in your views.
+numpy
+scipy
+librosa
+openai-whisper
+
+# PDF/Document Processing (from resume analysis helper in views.py)
+PyMuPDF

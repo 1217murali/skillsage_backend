@@ -1,0 +1,51 @@
+# Virtual Environment
+venv/
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# SQLite database
+db.sqlite3
+*.sqlite3
+
+# Chroma vector database
+chroma_db/
+
+# Temporary files
+temp/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code settings
+.vscode/
+
+# Python build files
+build/
+dist/
+*.egg-info/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Test outputs
+*.coverage
+htmlcov/
+
+# Environment config
+.env.local
+.env.*
+
+# Node modules (if frontend added later)
+node_modules/
+
+# # Images generated during processing (optional)
+# *.png
+# *.jpg
+# *.jpeg
