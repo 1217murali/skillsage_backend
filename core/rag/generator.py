@@ -1,8 +1,18 @@
 import requests
 import os
+import json
+from dotenv import load_dotenv
 
-GEMINI_API_KEY = os.getenv("AIzaSyDEV4I8_gmbwDN2eMfdHd_xBQaLzZ-oUoE")
-''' genai.configure(api_key="AIzaSyD54U-jTwxNSIlit3Yd33Hu0s0H9PKJuIw")
+# load environment variables from a .env file (if present)
+load_dotenv()
+
+# use a descriptive variable name for the env var
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY is not set in the environment")
+
+# legacy notes for reference (do not include actual keys in source)
+''' genai.configure(api_key="<REDACTED>")
     model = genai.GenerativeModel("gemini-2.0-flash")'''
 def generate_questions(course, difficulty, context_docs, total_duration=25):
     prompt = f"""

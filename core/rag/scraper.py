@@ -2,13 +2,21 @@ import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
 import json
+import os
+from dotenv import load_dotenv
 
-# Configure OpenRouter client
+# load environment variables
+load_dotenv()
+
+# Configure OpenRouter client using key from env
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+if not OPENROUTER_API_KEY:
+    raise RuntimeError("OPENROUTER_API_KEY is not set in the environment")
+
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key="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",  # replace with your key
+    api_key=OPENROUTER_API_KEY,
 )
-
 def get_links_from_openrouter(course, difficulty):
     """
     Ask OpenRouter model to return relevant links for the given course and difficulty.
