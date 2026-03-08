@@ -6,6 +6,7 @@ django
 djangorestframework
 python-decouple
 django-cors-headers
+gunicorn
 
 # Authentication and Security
 djangorestframework-simplejwt
