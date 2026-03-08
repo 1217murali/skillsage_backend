@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.sqlite3
+chroma_db/
+*.log
+.env
+.npm/
