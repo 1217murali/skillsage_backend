@@ -1931,3 +1931,148 @@ def p2p_ai_feedback(request):
         return Response({"error": "Match not found"}, status=404)
 
 
+# --- Quiz ML Difficulty Adapter Views ---
+
+from .models import QuizQuestionBank, QuizResponse, UserQuizProfile, QuizAttempt, UserModuleStat, UserModelStore
+from .serializers import QuizQuestionSerializer, QuizSubmitSerializer
+from .quiz_ml import predict_next_difficulty, train_user_model
+from .quiz_ai import get_adaptive_question
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_adaptive_quiz(request):
+    """
+    V2: Fetches dynamic AI generated questions based on SQLite UserModelStore ML predictions.
+    """
+    user = request.user
+    module_id = request.query_params.get('module_id')
+    
+    if not module_id:
+        return Response({"error": "module_id is required"}, status=400)
+    
+    # 1. Check if user is on a "Cold Start" for this module (less than 10 attempts)
+    attempts_count = QuizAttempt.objects.filter(user=user, module_id=module_id).count()
+    
+    questions = []
+    
+    if attempts_count == 0:
+        # Cold Start: 5 Easy, 3 Medium, 2 Hard
+        distribution = ['easy']*5 + ['medium']*3 + ['hard']*2
+        for diff in distribution:
+            q = get_adaptive_question(user, module_id, diff)
+            if q: questions.append(q)
+    else:
+        # Returning User: Get dynamic batch via ML prediction
+        # For a standard batch of 5 questions
+        limit = int(request.query_params.get('limit', 5))
+        for _ in range(limit):
+            predicted_diff = predict_next_difficulty(user, module_id)
+            q = get_adaptive_question(user, module_id, predicted_diff)
+            if q:
+                # Attach the prediction for tracking
+                q['predicted_difficulty'] = predicted_diff
+                questions.append(q)
+
+    if not questions:
+        return Response({"error": "No questions could be generated or fetched for this module."}, status=500)
+        
+    return Response(questions) # Return the raw JSON dicts
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_quiz_responses(request):
+    """
+    V2: Saves Enhanced QuizAttempts and triggers UserModuleStat UI updates and Model Training.
+    Expects payload: {"module_id": "...", "responses": [{"question_hash": "...", "question_text": "...", "difficulty": "...", "is_correct": true, "time_taken_seconds": 12, "confidence_rating": 4, "topic": "..."}, ...]}
+    """
+    user = request.user
+    module_id = request.data.get('module_id')
+    responses_data = request.data.get('responses', [])
+    
+    if not module_id or not responses_data:
+        return Response({"error": "module_id and responses provided."}, status=400)
+    
+    saved_count = 0
+    trained_just_now = False
+    
+    # Initialize or fetch stats
+    stats, _ = UserModuleStat.objects.get_or_create(user=user, module_id=module_id)
+    
+    for resp in responses_data:
+        is_correct = resp.get('is_correct', False)
+        
+        QuizAttempt.objects.create(
+            user=user,
+            module_id=module_id,
+            question_text=resp.get('question_text', ''),
+            question_hash=resp.get('hash', ''), # The frontend should pass what we sent it
+            difficulty=resp.get('difficulty', 'medium'),
+            topic=resp.get('topic', ''),
+            is_correct=is_correct,
+            time_taken_seconds=resp.get('time_taken_seconds', 0),
+            confidence_rating=resp.get('confidence_rating', 3),
+            predicted_probability=None # we aren't sending this to front end for now, but we could
+        )
+        saved_count += 1
+        
+        # Update Stats
+        stats.total_answered += 1
+        if is_correct:
+            stats.correct_count += 1
+            stats.current_streak += 1
+            if stats.current_streak > stats.best_streak:
+                stats.best_streak = stats.current_streak
+        else:
+            stats.wrong_count += 1
+            stats.current_streak = 0
+            
+    stats.save()
+            
+    if saved_count > 0:
+        total_responses_now = QuizAttempt.objects.filter(user=user, module_id=module_id).count()
+        # Trigger model training if total attempts hit thresholds
+        if total_responses_now >= 10:
+            store = UserModelStore.objects.filter(user=user, module_id=module_id).first()
+            # If no model yet, or 5 new attempts since last train
+            if not store or (total_responses_now - store.training_samples_count >= 5):
+                trained_just_now = train_user_model(user, module_id)
+            
+    return Response({
+        "message": f"Saved {saved_count} responses.",
+        "model_trained": trained_just_now,
+        "total_responses": stats.total_answered
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_quiz_profile_status(request):
+    """
+    V2: Returns stats for the module dashboard.
+    """
+    module_id = request.query_params.get('module_id')
+    if not module_id:
+        return Response({"error": "module_id required"}, status=400)
+        
+    stats = UserModuleStat.objects.filter(user=request.user, module_id=module_id).first()
+    store = UserModelStore.objects.filter(user=request.user, module_id=module_id).first()
+    
+    if not stats:
+        return Response({
+            "is_model_trained": False,
+            "total_answered": 0,
+            "correct_count": 0,
+            "wrong_count": 0,
+            "current_streak": 0,
+            "best_streak": 0
+        })
+        
+    return Response({
+        "is_model_trained": store is not None and store.model_data is not None,
+        "total_answered": stats.total_answered,
+        "correct_count": stats.correct_count,
+        "wrong_count": stats.wrong_count,
+        "current_streak": stats.current_streak,
+        "best_streak": stats.best_streak,
+    })
+
+

@@ -325,3 +325,107 @@ class InterviewQueue(models.Model):
     def __str__(self):
         return f"{self.user.username} waiting since {self.joined_at}"
 
+
+# --- Quiz & ML Difficulty Models ---
+
+class QuizQuestionBank(models.Model):
+    """
+    Stores all available quiz questions.
+    """
+    course_name = models.CharField(max_length=100)
+    module_id = models.CharField(max_length=50) # e.g., 'd-101'
+    question_text = models.TextField()
+    options = models.JSONField() # List of string options
+    correct_answer_index = models.IntegerField()
+    base_difficulty = models.IntegerField(default=3) # 1=Easiest, 5=Hardest
+
+    def __str__(self):
+        return f"[{self.module_id}] {self.question_text[:50]}"
+
+class QuizResponse(models.Model):
+    """
+    Tracks a user's answer to a specific question for ML training.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="quiz_responses")
+    question = models.ForeignKey(QuizQuestionBank, on_delete=models.CASCADE)
+    is_correct = models.BooleanField()
+    time_taken_seconds = models.IntegerField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.question.id} - {'Correct' if self.is_correct else 'Incorrect'}"
+
+class UserQuizProfile(models.Model):
+    """
+    Tracks the ML status for a user's adaptive quiz model.
+    """
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="quiz_profile")
+    is_model_trained = models.BooleanField(default=False)
+    total_responses = models.IntegerField(default=0)
+    last_trained_at = models.DateTimeField(null=True, blank=True)
+    # Could optionally store model file path here, but for now we'll use a standard path based on user ID
+
+    def __str__(self):
+        return f"{self.user.username} Quiz Profile (Trained: {self.is_model_trained})"
+
+# --- V2 Adaptive Quiz Extension ---
+
+class UserModuleStat(models.Model):
+    """
+    Dashboard metrics for a specific Module/Subject area.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="module_stats")
+    module_id = models.CharField(max_length=50) # e.g., 'm-101', 'frontend', 'backend'
+    total_answered = models.IntegerField(default=0)
+    correct_count = models.IntegerField(default=0)
+    wrong_count = models.IntegerField(default=0)
+    current_streak = models.IntegerField(default=0)
+    best_streak = models.IntegerField(default=0)
+    last_quiz_date = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'module_id')
+
+    def __str__(self):
+        return f"{self.user.username} - {self.module_id} Stats"
+
+class QuizAttempt(models.Model):
+    """
+    V2 Enhanced interaction log to handle AI dynamic questions and advanced ML telemetry.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="enhanced_quiz_attempts")
+    module_id = models.CharField(max_length=50)
+    
+    # Question Details (Supports AI Generated or Pre-banked)
+    question_text = models.TextField()
+    question_hash = models.CharField(max_length=255, db_index=True) # MD5 for anti-duplication
+    difficulty = models.CharField(max_length=20, default='medium') # AI or Bank assigned
+    topic = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Telemetry
+    is_correct = models.BooleanField()
+    time_taken_seconds = models.IntegerField()
+    confidence_rating = models.IntegerField(null=True, blank=True) # 1-5 scale
+    predicted_probability = models.FloatField(null=True, blank=True) # ML's prediction at the time
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.module_id} - Hash: {self.question_hash[:8]}"
+
+class UserModelStore(models.Model):
+    """
+    Stores serialized ML artifacts directly in the database to scale horizontally.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="ml_models")
+    module_id = models.CharField(max_length=50)
+    
+    # Binary representation of the scikit-learn model
+    model_data = models.BinaryField()
+    last_trained_at = models.DateTimeField(auto_now=True)
+    training_samples_count = models.IntegerField(default=0)
+
+    class Meta:
+        unique_together = ('user', 'module_id')
+
+    def __str__(self):
+        return f"ML Model for {self.user.username} - {self.module_id}"

@@ -52,3 +52,17 @@ class ProfileSerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
+
+# --- Quiz Serializers ---
+
+from .models import QuizQuestionBank, QuizResponse
+
+class QuizQuestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuizQuestionBank
+        fields = ['id', 'module_id', 'question_text', 'options', 'correct_answer_index']
+
+class QuizSubmitSerializer(serializers.Serializer):
+    question_id = serializers.IntegerField()
+    is_correct = serializers.BooleanField()
+    time_taken_seconds = serializers.IntegerField()

@@ -1,3 +1,9 @@
+# PyTorch CPU-Only builds (Mandatory for Railway/Render Image Size Limits)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+torchaudio
+
 # Core Web Framework
 django
 djangorestframework
@@ -31,3 +37,8 @@ openai-whisper
 
 # PDF/Document Processing (from resume analysis helper in views.py)
 PyMuPDF
+
+# Machine Learning for Quiz Difficulty Adapter
+scikit-learn
+pandas
+joblib

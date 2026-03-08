@@ -38,4 +38,8 @@ urlpatterns = [
     path('p2p/signal/', views.exchange_signal, name='exchange_signal'),
     path('p2p/ai_feedback/', views.p2p_ai_feedback, name='p2p_ai_feedback'),
 
+    # ML Quiz Difficulty Adapter
+    path('quiz/adaptive/', views.get_adaptive_quiz, name='get_adaptive_quiz'),
+    path('quiz/submit/', views.submit_quiz_responses, name='submit_quiz_responses'),
+    path('quiz/status/', views.get_quiz_profile_status, name='get_quiz_profile_status'),
 ]
