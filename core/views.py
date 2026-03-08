@@ -77,12 +77,17 @@ client = OpenAI(
 # Global cache for documents (legacy)
 documents = []
 
-try:
-    # Use 'base' for a good balance of speed and accuracy
-    whisper_model = whisper.load_model("small")
-except Exception as e:
-    print(f"CRITICAL: Failed to load Whisper model: {e}")
-    whisper_model = None
+# We load the Whisper model lazily to prevent OOM/large memory consumption on startup
+whisper_model = None
+
+def get_whisper_model():
+    global whisper_model
+    if whisper_model is None and whisper:
+        try:
+            whisper_model = whisper.load_model("small")
+        except Exception as e:
+            print(f"CRITICAL: Failed to load Whisper model: {e}")
+    return whisper_model
 
 # Helper Functions
 def extract_json_from_text(text):
@@ -501,7 +506,8 @@ def _transcribe_wav_file(audio_file):
     
     Returns: transcribed text (str) or an error string starting with "ERROR"
     """
-    if not whisper_model:
+    model = get_whisper_model()
+    if not model:
         return "ERROR: Transcription model not loaded on server."
 
     try:
@@ -524,7 +530,7 @@ def _transcribe_wav_file(audio_file):
         audio_resampled = librosa.resample(audio, orig_sr=samplerate, target_sr=16000)
     
         # Transcribe
-        result = whisper_model.transcribe(audio_resampled, language="en")
+        result = model.transcribe(audio_resampled, language="en")
         print(result["text"])
         return result["text"].strip()
 
@@ -1037,7 +1043,7 @@ def get_or_create_courses(request):
             "is_completed": course.is_completed,
             "started": course.started,
             "ended": course.ended,
-            "last_updated": format(course.last_updated, 'Y-m-d\TH:i:sP'),
+            "last_updated": format(course.last_updated, r'Y-m-d\TH:i:sP'),
         })
         i=i+1
 
